@@ -49,11 +49,46 @@ npm run dev   # http://localhost:3000
 ```
 
 ### 4. デプロイ
-- **Web**: Vercel で本リポジトリをimport、Root Directory を `web` に設定。
-  環境変数 `ANTHROPIC_API_KEY`(RAG用)、`SUPABASE_URL`、`SUPABASE_ANON_KEY` を設定。
-- **バッチ**: GitHub リポジトリの Settings → Secrets に
-  `EDINET_API_KEY` / `ANTHROPIC_API_KEY` / `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` を登録。
-  毎月6日 6:00 JST に前月分を自動収集(手動実行も workflow_dispatch で可能)。
+
+#### Web(Azure Static Web Apps / 推奨・無料)
+
+`web/` の Next.js は SSR + APIルート(`/api/ask`)を含むが、**Azure Static Web Apps の
+Free プランはマネージドバックエンドで hybrid Next.js をそのまま実行できる(月額 $0)**。
+サンプルデータで動くため、Supabase も EDINET APIキーも無しに公開できる。
+
+1. Azure でリソース作成(Free プラン)。Azure CLI の場合:
+   ```bash
+   az login
+   az group create -n rg-audit-board-lens -l japaneast
+   az staticwebapp create \
+     -n audit-board-lens -g rg-audit-board-lens -l eastasia \
+     --sku Free
+   # デプロイトークンを取得
+   az staticwebapp secrets list -n audit-board-lens -g rg-audit-board-lens \
+     --query "properties.apiKey" -o tsv
+   ```
+   ※ ポータルで作る場合は「Static Web Apps → 作成 → プラン: Free」。デプロイソースは
+   「その他(Other)」を選ぶと本リポジトリ同梱の GitHub Actions がそのまま使える。
+2. GitHub の **Settings → Secrets and variables → Actions** に
+   `AZURE_STATIC_WEB_APPS_API_TOKEN` = 上記トークンを登録。
+3. `main` へ push すると `.github/workflows/azure-static-web-apps.yml` が
+   `app_location: web` をビルド&デプロイし、`https://<name>.azurestaticapps.net` で公開。
+4. (任意)RAG応答を本番化するなら SWA リソースの
+   **設定 → 環境変数(Application settings)** に `ANTHROPIC_API_KEY` を登録
+   (未設定でもデモ応答で動作)。
+
+> コスト目安: Static Web Apps **Free = $0**。実データ運用時に加わるのは Supabase(無料枠あり)、
+> RAG利用時の Anthropic API 従量課金、バッチ実行(GitHub Actions 無料枠内)程度。
+
+#### バッチ(EDINET月次収集)
+GitHub リポジトリの Settings → Secrets に
+`EDINET_API_KEY` / `ANTHROPIC_API_KEY` / `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` を登録。
+毎月6日 6:00 JST に前月分を自動収集(手動実行も workflow_dispatch で可能)。
+
+> **EDINET APIキーについて**: EDINET API v2 は `Subscription-Key`(APIキー)が必須。
+> [EDINET 開発者向けページ](https://api.edinet-fsa.go.jp/) でメール登録するとキーが発行される
+> (無料・審査なし)。**Webサイトの公開・閲覧だけなら不要**で、実企業データを収集する
+> バッチを回すときにのみ必要。
 
 ## ロードマップ(リサーチ報告書準拠)
 

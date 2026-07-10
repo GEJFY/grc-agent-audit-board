@@ -1,0 +1,51 @@
+name: Azure Static Web Apps CI/CD
+
+# Azure Static Web Apps (Free プラン) へ web/ の Next.js アプリをデプロイする。
+# 事前準備:
+#   1. Azure で Static Web App (プラン: Free) を作成し、デプロイトークンを取得
+#   2. GitHub リポジトリの Settings > Secrets and variables > Actions に
+#      AZURE_STATIC_WEB_APPS_API_TOKEN を登録
+#   3. (任意) RAG応答を本番化する場合は SWA リソースの
+#      「環境変数(Application settings)」に ANTHROPIC_API_KEY を登録
+# 詳細は README「Azureへのデプロイ」を参照。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
+
+jobs:
+  build_and_deploy:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    name: Build and Deploy
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Build And Deploy
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: web
+          api_location: ""
+          output_location: ""
+        env:
+          # ビルド時にも参照できるよう渡す(実行時は SWA の環境変数側でも設定する)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  close_pull_request:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    name: Close Pull Request
+    steps:
+      - name: Close Pull Request
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: close
